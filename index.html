@@ -3,37 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FinanceFlow Pro | Gestión Personal</title>
-    <!-- Tailwind CSS para Estilos -->
+    <title>FinanceFlow Pro | Gestión Inteligente</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React y Babel para ejecución en navegador -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://unpkg.com/lucide-react@latest"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 5px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #e2e8f0;
-            border-radius: 10px;
-        }
-        
-        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -41,71 +24,30 @@
 
     <script type="text/babel">
         const { useState, useMemo, useEffect } = React;
-        const { 
-            LayoutDashboard, Wallet, Receipt, Lock, TrendingUp, Plus, 
-            Trash2, PieChart, ArrowUpCircle, ArrowDownCircle, PiggyBank,
-            ChevronLeft, Menu, X, CheckCircle2, AlertCircle, ChevronRight
-        } = lucide;
 
-        // --- Componentes de UI ---
+        // --- Componentes de Interfaz ---
+
+        const Icon = ({ name, className = "w-5 h-5" }) => {
+            useEffect(() => { lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} className={className}></i>;
+        };
 
         const Toast = ({ message, type, onClose }) => {
             useEffect(() => {
                 const timer = setTimeout(onClose, 3000);
                 return () => clearTimeout(timer);
             }, [onClose]);
-
             return (
-                <div className={`fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl animate-fade-in ${
+                <div className={`fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl animate-in ${
                     type === 'success' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white'
                 }`}>
-                    <i data-lucide={type === 'success' ? 'check-circle-2' : 'alert-circle'} className="w-5 h-5"></i>
+                    <Icon name={type === 'success' ? 'check-circle' : 'info'} />
                     <span className="font-medium">{message}</span>
                 </div>
             );
         };
 
-        const KPICard = ({ title, value, iconName, color }) => {
-            const colors = {
-                emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-                rose: "bg-rose-50 text-rose-600 border-rose-100",
-                blue: "bg-blue-50 text-blue-600 border-blue-100",
-                purple: "bg-purple-50 text-purple-600 border-purple-100",
-            };
-            return (
-                <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col gap-4 group hover:border-indigo-200 transition-all">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shrink-0 ${colors[color]}`}>
-                        <i data-lucide={iconName} className="w-6 h-6"></i>
-                    </div>
-                    <div>
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{title}</p>
-                        <p className="text-2xl font-black text-slate-900 mt-1">
-                            {typeof value === 'number' ? `$${value.toLocaleString()}` : value}
-                        </p>
-                    </div>
-                </div>
-            );
-        };
-
-        const PresupuestoBar = ({ label, value, total, color }) => {
-            const perc = total > 0 ? Math.min((value / total) * 100, 100) : 0;
-            return (
-                <div className="space-y-3">
-                    <div className="flex justify-between items-end">
-                        <div>
-                            <p className="text-sm font-black text-slate-800">{label}</p>
-                            <p className="text-xs text-slate-400 font-bold tracking-tight">${value.toLocaleString()} gastados</p>
-                        </div>
-                        <span className="text-sm font-black text-indigo-600">{perc.toFixed(0)}%</span>
-                    </div>
-                    <div className="h-4 bg-slate-100 rounded-full overflow-hidden p-1">
-                        <div className={`h-full rounded-full ${color} transition-all duration-1000`} style={{ width: `${perc}%` }}></div>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- App Principal ---
+        // --- Aplicación Principal ---
 
         function App() {
             const [activeTab, setActiveTab] = useState('dashboard');
@@ -113,191 +55,221 @@
             const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
             const [toast, setToast] = useState(null);
             
-            // Cargar datos iniciales de LocalStorage
+            // Estado de Transacciones con Lógica de Reinicio Mensual Automático
             const [transactions, setTransactions] = useState(() => {
-                const saved = localStorage.getItem('financeflow_data');
-                return saved ? JSON.parse(saved) : [
-                    { id: 1, type: 'income', category: 'Salario', amount: 3500, date: '2023-10-01', description: 'Nómina principal' },
-                    { id: 2, type: 'fixed', category: 'Alquiler', amount: 1200, date: '2023-10-02', description: 'Renta mensual' },
-                    { id: 3, type: 'expense', category: 'Supermercado', amount: 150, date: '2023-10-10', description: 'Compra semanal' }
+                const saved = localStorage.getItem('financeflow_v2_data');
+                const initialData = saved ? JSON.parse(saved) : [
+                    { id: 1, type: 'income', category: 'Salario', amount: 3500, date: '2023-10-01', description: 'Nómina', isPaid: true, lastPaidMonth: '' },
+                    { id: 2, type: 'fixed', category: 'Alquiler', amount: 1200, date: '2023-10-02', description: 'Renta mensual', isPaid: false, lastPaidMonth: '' },
+                    { id: 3, type: 'fixed', category: 'Internet', amount: 60, date: '2023-10-05', description: 'Fibra óptica', isPaid: false, lastPaidMonth: '' }
                 ];
+
+                // REINICIO MENSUAL: Si cambia el mes (YYYY-MM), los gastos fijos se marcan como no pagados
+                const currentMonth = new Date().toISOString().slice(0, 7);
+                return initialData.map(t => {
+                    if (t.type === 'fixed' && t.lastPaidMonth !== currentMonth) {
+                        return { ...t, isPaid: false };
+                    }
+                    return t;
+                });
             });
 
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [newTransaction, setNewTransaction] = useState({
-                type: 'expense',
-                category: '',
-                amount: '',
-                description: '',
-                date: new Date().toISOString().split('T')[0]
+                type: 'expense', category: '', amount: '', description: '', date: new Date().toISOString().split('T')[0]
             });
 
-            // Guardar en LocalStorage cada vez que cambien las transacciones
             useEffect(() => {
-                localStorage.setItem('financeflow_data', JSON.stringify(transactions));
-                lucide.createIcons(); // Refrescar iconos cuando cambia el DOM
-            }, [transactions, activeTab, isSidebarCollapsed, isMobileMenuOpen, isModalOpen]);
+                localStorage.setItem('financeflow_v2_data', JSON.stringify(transactions));
+                lucide.createIcons();
+            }, [transactions, activeTab, isSidebarCollapsed]);
 
-            const showToast = (message, type = 'success') => {
-                setToast({ message, type });
-            };
+            const showToast = (message, type = 'success') => setToast({ message, type });
 
+            // Cálculos Financieros Avanzados
             const stats = useMemo(() => {
                 const income = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
-                const fixed = transactions.filter(t => t.type === 'fixed').reduce((acc, t) => acc + Number(t.amount), 0);
+                const fixedItems = transactions.filter(t => t.type === 'fixed');
                 const variable = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
                 const savings = transactions.filter(t => t.type === 'saving').reduce((acc, t) => acc + Number(t.amount), 0);
-                const totalExpenses = fixed + variable;
-                const balance = income - totalExpenses - savings;
+
+                const totalFixed = fixedItems.reduce((acc, t) => acc + Number(t.amount), 0);
+                const paidFixed = fixedItems.filter(t => t.isPaid).reduce((acc, t) => acc + Number(t.amount), 0);
+                const pendingFixed = totalFixed - paidFixed;
+                
+                // SALDO REAL: Ingresos menos (Pagos Fijos realizados + Gastos Variables + Ahorros)
+                // Es el dinero que tienes en el bolsillo ahora mismo.
+                const realBalance = income - (paidFixed + variable + savings);
+
+                // SALDO PROYECTADO: Ingresos menos (Total de Gastos Fijos + Gastos Variables + Ahorros)
+                // Es lo que te quedará cuando pagues todas tus deudas del mes.
+                const projectedBalance = income - (totalFixed + variable + savings);
+                
                 const savingsRate = income > 0 ? ((savings / income) * 100).toFixed(1) : 0;
-                return { income, fixed, variable, savings, totalExpenses, balance, savingsRate };
+
+                return { income, totalFixed, paidFixed, pendingFixed, variable, savings, realBalance, projectedBalance, savingsRate };
             }, [transactions]);
 
             const handleAddTransaction = (e) => {
                 e.preventDefault();
                 if (!newTransaction.amount || !newTransaction.category) return;
-                const item = { ...newTransaction, id: Date.now(), amount: Number(newTransaction.amount) };
+                const currentMonth = new Date().toISOString().slice(0, 7);
+                const item = { 
+                    ...newTransaction, 
+                    id: Date.now(), 
+                    amount: Number(newTransaction.amount),
+                    isPaid: newTransaction.type === 'income',
+                    lastPaidMonth: newTransaction.type === 'fixed' ? '' : currentMonth
+                };
                 setTransactions(prev => [...prev, item]);
                 setIsModalOpen(false);
                 setNewTransaction({ type: 'expense', category: '', amount: '', description: '', date: new Date().toISOString().split('T')[0] });
-                showToast("Registro guardado con éxito");
+                showToast("Registro agregado con éxito");
             };
 
-            const handleDeleteTransaction = (id) => {
+            const togglePaidStatus = (id) => {
+                const currentMonth = new Date().toISOString().slice(0, 7);
+                setTransactions(prev => prev.map(t => {
+                    if (t.id === id) {
+                        const newStatus = !t.isPaid;
+                        return { ...t, isPaid: newStatus, lastPaidMonth: newStatus ? currentMonth : '' };
+                    }
+                    return t;
+                }));
+                showToast("Estado de pago actualizado");
+            };
+
+            const deleteTransaction = (id) => {
                 setTransactions(prev => prev.filter(t => t.id !== id));
                 showToast("Registro eliminado", "info");
             };
 
             const menuItems = [
                 { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
-                { id: 'income', label: 'Entradas', icon: 'arrow-up-circle' },
-                { id: 'fixed', label: 'Gastos Fijos', icon: 'lock' },
-                { id: 'expense', label: 'Variables', icon: 'receipt' },
+                { id: 'income', label: 'Ingresos', icon: 'arrow-up-right' },
+                { id: 'fixed', label: 'Gastos Fijos', icon: 'repeat' },
+                { id: 'expense', label: 'Variables', icon: 'shopping-cart' },
                 { id: 'saving', label: 'Ahorros', icon: 'piggy-bank' },
             ];
 
             return (
                 <div className="flex h-screen overflow-hidden">
-                    {/* Sidebar Desktop */}
+                    {/* Barra Lateral */}
                     <aside className={`hidden md:flex flex-col bg-slate-900 text-white transition-all duration-500 relative ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
-                        <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="absolute -right-3 top-10 bg-indigo-600 text-white rounded-full p-1.5 shadow-xl z-50">
-                            <i data-lucide={isSidebarCollapsed ? "menu" : "chevron-left"} className="w-4 h-4"></i>
+                        <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="absolute -right-3 top-12 bg-indigo-600 text-white rounded-full p-1 shadow-xl z-50">
+                            <Icon name={isSidebarCollapsed ? "chevron-right" : "chevron-left"} className="w-4 h-4" />
                         </button>
-
-                        <div className={`p-8 mb-4 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
+                        <div className="p-8 mb-4">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0">
-                                    <i data-lucide="trending-up" className="w-6 h-6 text-white"></i>
+                                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
+                                    <Icon name="trending-up" className="text-white w-6 h-6" />
                                 </div>
                                 {!isSidebarCollapsed && (
                                     <div className="overflow-hidden">
-                                        <h1 className="text-xl font-bold whitespace-nowrap">FinanceFlow</h1>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Local Pro</p>
+                                        <h1 className="text-xl font-bold tracking-tight">FinanceFlow</h1>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">Inteligente</p>
                                     </div>
                                 )}
                             </div>
                         </div>
-
                         <nav className="flex-1 px-4 space-y-2">
                             {menuItems.map((item) => (
-                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all group relative ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${isSidebarCollapsed ? 'justify-center' : ''}`}>
-                                    <i data-lucide={item.icon} className="w-5 h-5 shrink-0"></i>
-                                    {!isSidebarCollapsed && <span className="font-semibold">{item.label}</span>}
+                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all relative ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-800'} ${isSidebarCollapsed ? 'justify-center' : ''}`}>
+                                    <Icon name={item.icon} />
+                                    {!isSidebarCollapsed && <span className="font-semibold text-sm">{item.label}</span>}
                                 </button>
                             ))}
                         </nav>
-
                         <div className="p-6">
-                            <div className={`bg-slate-800/50 rounded-2xl border border-slate-700 ${isSidebarCollapsed ? 'p-3' : 'p-5'}`}>
-                                <div className="flex items-center gap-3">
-                                    <i data-lucide="wallet" className={`w-5 h-5 ${stats.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}></i>
-                                    {!isSidebarCollapsed && <span className="text-lg font-black">${stats.balance.toLocaleString()}</span>}
-                                </div>
+                            <div className={`bg-slate-800 rounded-2xl p-4 border border-slate-700 ${isSidebarCollapsed ? 'p-2 flex justify-center' : ''}`}>
+                                <Icon name="wallet" className={stats.realBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'} />
+                                {!isSidebarCollapsed && <p className="mt-2 text-[10px] font-black text-slate-500 uppercase">Saldo Real</p>}
+                                {!isSidebarCollapsed && <p className="text-lg font-black tracking-tight">${stats.realBalance.toLocaleString()}</p>}
                             </div>
                         </div>
                     </aside>
 
-                    {/* Mobile Menu Overlay */}
+                    {/* Menú Móvil */}
                     {isMobileMenuOpen && (
-                        <div className="fixed inset-0 z-[60] md:hidden bg-slate-900/95 backdrop-blur-lg p-8">
-                            <div className="flex justify-between items-center mb-12 text-white">
-                                <h1 className="text-2xl font-bold flex items-center gap-3"><i data-lucide="trending-up"></i> FinanceFlow</h1>
-                                <button onClick={() => setIsMobileMenuOpen(false)}><i data-lucide="x" className="w-8 h-8"></i></button>
+                        <div className="fixed inset-0 z-[60] md:hidden bg-slate-900/95 backdrop-blur-lg p-8 animate-in text-white">
+                            <div className="flex justify-between items-center mb-12">
+                                <h1 className="text-2xl font-bold">FinanceFlow</h1>
+                                <button onClick={() => setIsMobileMenuOpen(false)}><Icon name="x" className="w-8 h-8" /></button>
                             </div>
                             <nav className="space-y-4">
                                 {menuItems.map((item) => (
-                                    <button key={item.id} onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-6 p-5 rounded-3xl text-xl font-bold ${activeTab === item.id ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>
-                                        <i data-lucide={item.icon}></i> {item.label}
+                                    <button key={item.id} onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-6 p-5 rounded-3xl text-xl font-bold ${activeTab === item.id ? 'bg-indigo-600' : 'text-slate-400'}`}>
+                                        <Icon name={item.icon} className="w-6 h-6" /> {item.label}
                                     </button>
                                 ))}
                             </nav>
                         </div>
                     )}
 
-                    {/* Content */}
+                    {/* Contenido Principal */}
                     <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
                         <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0">
                             <div className="flex items-center gap-4">
-                                <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 text-slate-600"><i data-lucide="menu"></i></button>
-                                <div>
-                                    <h2 className="text-lg md:text-2xl font-black text-slate-800 capitalize leading-tight">{activeTab}</h2>
-                                    <p className="text-xs md:text-sm text-slate-500 font-medium">Panel de control</p>
-                                </div>
+                                <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 text-slate-600"><Icon name="menu" /></button>
+                                <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">
+                                    {activeTab === 'fixed' ? 'Obligaciones Mensuales' : activeTab === 'dashboard' ? 'Mi Resumen Financiero' : activeTab}
+                                </h2>
                             </div>
-                            <button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg font-bold">
-                                <i data-lucide="plus"></i> <span>Nuevo</span>
+                            <button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-100 font-bold transition-all active:scale-95">
+                                <Icon name="plus" /> <span className="hidden sm:inline">Nuevo Registro</span>
                             </button>
                         </header>
 
                         <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                            <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
+                            <div className="max-w-6xl mx-auto">
                                 {activeTab === 'dashboard' ? (
-                                    <Dashboard stats={stats} transactions={transactions} />
+                                    <Dashboard stats={stats} transactions={transactions} onToggle={togglePaidStatus} />
                                 ) : (
                                     <TransactionView 
                                         title={menuItems.find(i => i.id === activeTab).label} 
                                         type={activeTab} 
                                         data={transactions.filter(t => t.type === activeTab)} 
-                                        onDelete={handleDeleteTransaction}
+                                        onDelete={deleteTransaction}
+                                        onToggle={togglePaidStatus}
                                     />
                                 )}
                             </div>
                         </div>
                     </main>
 
-                    {/* Modal */}
+                    {/* Ventana Modal de Entrada */}
                     {isModalOpen && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
-                            <div className="bg-white rounded-[2rem] p-8 w-full max-w-lg shadow-2xl relative">
-                                <h3 className="text-2xl font-black text-slate-800 mb-8">Nueva Operación</h3>
+                            <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-lg shadow-2xl relative animate-in">
+                                <h3 className="text-2xl font-black text-slate-800 mb-8">Registrar Movimiento</h3>
                                 <form onSubmit={handleAddTransaction} className="space-y-6">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="col-span-2 sm:col-span-1">
-                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Tipo</label>
-                                            <select value={newTransaction.type} onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value})} className="w-full bg-slate-50 rounded-2xl border-none ring-1 ring-slate-200 p-4 font-semibold">
-                                                <option value="income">Ingreso</option>
-                                                <option value="fixed">Gasto Fijo</option>
-                                                <option value="expense">Gasto Variable</option>
-                                                <option value="saving">Ahorro</option>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Categoría</label>
+                                            <select value={newTransaction.type} onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value})} className="w-full bg-slate-50 rounded-2xl border-none ring-1 ring-slate-200 p-4 font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 transition-all outline-none">
+                                                <option value="income">Entrada (Dinero que llega)</option>
+                                                <option value="fixed">Gasto Fijo (Obligación)</option>
+                                                <option value="expense">Gasto Variable (Día a día)</option>
+                                                <option value="saving">Ahorro / Inversión</option>
                                             </select>
                                         </div>
                                         <div className="col-span-2 sm:col-span-1">
-                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Monto ($)</label>
-                                            <input type="number" required placeholder="0.00" value={newTransaction.amount} onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})} className="w-full bg-slate-50 rounded-2xl border-none ring-1 ring-slate-200 p-4 font-bold text-indigo-600" />
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Monto ($)</label>
+                                            <input type="number" step="0.01" required placeholder="0.00" value={newTransaction.amount} onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})} className="w-full bg-slate-50 rounded-2xl border-none ring-1 ring-slate-200 p-4 font-black text-xl text-indigo-600 focus:ring-2 focus:ring-indigo-500 outline-none" />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="col-span-2 sm:col-span-1">
-                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Categoría</label>
-                                            <input type="text" required placeholder="Eje: Super" value={newTransaction.category} onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})} className="w-full bg-slate-50 rounded-2xl border-none ring-1 ring-slate-200 p-4 font-semibold" />
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Concepto</label>
+                                            <input type="text" required placeholder="Ej: Renta, Super..." value={newTransaction.category} onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})} className="w-full bg-slate-50 rounded-2xl border-none ring-1 ring-slate-200 p-4 font-bold focus:ring-2 focus:ring-indigo-500 outline-none" />
                                         </div>
                                         <div className="col-span-2 sm:col-span-1">
-                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Fecha</label>
-                                            <input type="date" required value={newTransaction.date} onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})} className="w-full bg-slate-50 rounded-2xl border-none ring-1 ring-slate-200 p-4 font-semibold" />
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Fecha</label>
+                                            <input type="date" required value={newTransaction.date} onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})} className="w-full bg-slate-50 rounded-2xl border-none ring-1 ring-slate-200 p-4 font-bold focus:ring-2 focus:ring-indigo-500 outline-none" />
                                         </div>
                                     </div>
-                                    <button type="submit" className="w-full bg-indigo-600 text-white p-5 rounded-2xl font-bold shadow-xl">Registrar Movimiento</button>
+                                    <button type="submit" className="w-full bg-indigo-600 text-white p-5 rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95">Guardar en mi Historial</button>
                                 </form>
                             </div>
                         </div>
@@ -308,51 +280,77 @@
             );
         }
 
-        function Dashboard({ stats, transactions }) {
+        // --- Componentes de Vista de Dashboard ---
+
+        function Dashboard({ stats, transactions, onToggle }) {
             return (
-                <div className="space-y-8">
+                <div className="space-y-8 animate-in">
+                    {/* Alerta de Gastos Fijos Pendientes */}
+                    {stats.pendingFixed > 0 && (
+                        <div className="bg-amber-50 border border-amber-200 p-5 rounded-[2rem] flex items-center justify-between gap-4 shadow-sm">
+                            <div className="flex items-center gap-4 text-amber-800">
+                                <div className="bg-amber-200 p-2.5 rounded-xl"><Icon name="alert-triangle" /></div>
+                                <div>
+                                    <p className="font-bold text-sm">Obligaciones Pendientes</p>
+                                    <p className="text-xs font-medium opacity-80">Te faltan pagar ${stats.pendingFixed.toLocaleString()} en gastos fijos este mes.</p>
+                                </div>
+                            </div>
+                            <button onClick={() => window.location.hash = '#fixed'} className="text-xs font-black text-amber-900 bg-amber-200/50 px-4 py-2 rounded-xl hover:bg-amber-200 transition-all uppercase tracking-tight">Resolver Ahora</button>
+                        </div>
+                    )}
+
+                    {/* KPIs Principales */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <KPICard title="Ingresos" value={stats.income} color="emerald" iconName="arrow-up-circle" />
-                        <KPICard title="Gastos" value={stats.totalExpenses} color="rose" iconName="arrow-down-circle" />
-                        <KPICard title="Ahorro" value={stats.savings} color="purple" iconName="piggy-bank" />
-                        <KPICard title="Ratio Ahorro" value={`${stats.savingsRate}%`} color="blue" iconName="pie-chart" />
+                        <StatItem title="Ingresos Totales" value={stats.income} color="emerald" icon="arrow-up-right" />
+                        <StatItem title="Saldo Real (En Mano)" value={stats.realBalance} color="blue" icon="wallet" />
+                        <StatItem title="Saldo Proyectado" value={stats.projectedBalance} color="rose" icon="target" />
+                        <StatItem title="Ahorro Acumulado" value={stats.savings} color="purple" icon="piggy-bank" />
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-10">Presupuesto Mensual</h3>
+                        {/* Gráfico de Distribución */}
+                        <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden group">
+                            <h3 className="text-lg font-black text-slate-800 mb-10 flex items-center gap-2">
+                                <Icon name="pie-chart" className="text-indigo-600" /> MI PRESUPUESTO ESTE MES
+                            </h3>
                             <div className="space-y-8">
-                                <PresupuestoBar label="Gastos Fijos" value={stats.fixed} total={stats.income} color="bg-blue-500" />
-                                <PresupuestoBar label="Gastos Variables" value={stats.variable} total={stats.income} color="bg-orange-500" />
-                                <PresupuestoBar label="Ahorros" value={stats.savings} total={stats.income} color="bg-indigo-500" />
-                                <div className="pt-6 border-t border-slate-100 flex justify-between items-center text-sm font-bold text-slate-400">
-                                    <span>BALANCE DISPONIBLE</span>
-                                    <span className="text-2xl font-black text-indigo-600">${stats.balance.toLocaleString()}</span>
+                                <Bar label="Gastos Fijos (Pagado)" value={stats.paidFixed} total={stats.income} color="bg-emerald-500" />
+                                <Bar label="Gastos Fijos (Pendiente)" value={stats.pendingFixed} total={stats.income} color="bg-amber-400" />
+                                <Bar label="Gastos Variables" value={stats.variable} total={stats.income} color="bg-orange-500" />
+                                <Bar label="Ahorros Mensuales" value={stats.savings} total={stats.income} color="bg-purple-500" />
+                                
+                                <div className="pt-8 border-t flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Líquido Actual</p>
+                                        <p className={`text-4xl font-black ${stats.realBalance >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>${stats.realBalance.toLocaleString()}</p>
+                                    </div>
+                                    <div className="text-right sm:text-right w-full sm:w-auto">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Eficiencia de Ahorro</p>
+                                        <p className="text-2xl font-black text-slate-700">{stats.savingsRate}%</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col h-[480px]">
-                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-8">Movimientos</h3>
+                        {/* Actividad Reciente */}
+                        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[520px]">
+                            <h3 className="text-lg font-black text-slate-800 mb-6 uppercase tracking-tight">Actividad</h3>
                             <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
-                                {transactions.length === 0 ? (
-                                    <p className="text-center text-slate-300 mt-20">Sin actividad</p>
-                                ) : (
-                                    transactions.slice(-10).reverse().map(t => (
-                                        <div key={t.id} className="flex items-center gap-4 p-4 rounded-3xl hover:bg-slate-50 border border-transparent hover:border-slate-100 group">
-                                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${t.type === 'income' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
-                                                <i data-lucide={t.type === 'income' ? 'plus' : 'arrow-down-circle'} className="w-5 h-5"></i>
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-bold text-slate-800 truncate">{t.category}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase">{t.date}</p>
-                                            </div>
-                                            <p className={`font-black ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
-                                                {t.type === 'income' ? '+' : '-'}${t.amount}
-                                            </p>
+                                {transactions.length === 0 ? <p className="text-center text-slate-300 mt-20 font-bold">Sin registros</p> : 
+                                 transactions.slice(-12).reverse().map(t => (
+                                    <div key={t.id} className="flex items-center gap-4 p-4 rounded-3xl hover:bg-slate-50 border border-transparent hover:border-slate-100 group transition-all">
+                                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${t.isPaid ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                                            <Icon name={t.type === 'income' ? 'plus' : t.type === 'fixed' ? 'repeat' : 'shopping-cart'} className="w-5 h-5" />
                                         </div>
-                                    ))
-                                )}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-bold text-slate-800 truncate text-sm">{t.category}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">{t.date}</p>
+                                        </div>
+                                        <p className={`font-black text-sm whitespace-nowrap ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                            {t.type === 'income' ? '+' : '-'}${t.amount.toLocaleString()}
+                                        </p>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -360,48 +358,123 @@
             );
         }
 
-        function TransactionView({ title, data, type, onDelete }) {
+        // --- Vista de Tablas de Transacciones ---
+
+        function TransactionView({ title, data, type, onDelete, onToggle }) {
             const total = data.reduce((acc, curr) => acc + curr.amount, 0);
+            const paidCount = data.filter(t => t.isPaid).length;
+
             return (
-                <div className="space-y-6">
+                <div className="space-y-6 animate-in">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-10 gap-6">
                         <div>
-                            <h3 className="text-3xl font-black text-slate-900 tracking-tight">{title}</h3>
-                            <p className="text-slate-500 font-medium">Análisis detallado de tus {title.toLowerCase()}</p>
+                            <h3 className="text-3xl font-black text-slate-900 tracking-tighter">{title}</h3>
+                            <p className="text-slate-500 font-medium">
+                                {type === 'fixed' ? `Progreso mensual: ${paidCount} pagados de ${data.length}` : `Historial completo de registros`}
+                            </p>
                         </div>
                         <div className="bg-white px-8 py-5 rounded-[2rem] border border-slate-200 text-right w-full sm:w-auto shadow-sm">
-                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total {title}</p>
                             <p className={`text-3xl font-black ${type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>${total.toLocaleString()}</p>
                         </div>
                     </div>
-                    <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-x-auto">
-                        <table className="w-full text-left min-w-[600px]">
-                            <thead className="bg-slate-50/50 text-slate-400 text-xs font-black uppercase">
+
+                    <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
+                        <table className="w-full text-left min-w-[750px]">
+                            <thead className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase">
                                 <tr>
-                                    <th className="px-8 py-6">Detalle</th>
+                                    {type === 'fixed' && <th className="px-8 py-6 w-20 text-center">Estado</th>}
+                                    <th className="px-8 py-6">Concepto</th>
                                     <th className="px-8 py-6">Fecha</th>
                                     <th className="px-8 py-6 text-right">Monto</th>
-                                    <th className="px-8 py-6 w-20"></th>
+                                    <th className="px-8 py-6 w-24">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-100">
                                 {data.map((item) => (
-                                    <tr key={item.id} className="hover:bg-slate-50 group">
+                                    <tr key={item.id} className={`hover:bg-slate-50 group transition-all ${item.isPaid && type === 'fixed' ? 'opacity-50' : ''}`}>
+                                        {type === 'fixed' && (
+                                            <td className="px-8 py-6 text-center">
+                                                <button 
+                                                    onClick={() => onToggle(item.id)}
+                                                    className={`w-10 h-10 rounded-2xl border-2 flex items-center justify-center transition-all ${item.isPaid ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-200' : 'border-slate-200 text-transparent hover:border-emerald-300'}`}
+                                                >
+                                                    <Icon name="check" className="w-5 h-5" />
+                                                </button>
+                                            </td>
+                                        )}
                                         <td className="px-8 py-6">
-                                            <p className="font-bold text-slate-800 text-lg leading-tight">{item.category}</p>
-                                            <p className="text-sm text-slate-400">{item.description || 'Sin nota'}</p>
+                                            <div className="flex flex-col">
+                                                <span className={`font-bold text-lg leading-tight transition-all ${item.isPaid && type === 'fixed' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                                                    {item.category}
+                                                </span>
+                                                <span className="text-xs text-slate-400 font-medium">{item.description || 'Sin nota adicional'}</span>
+                                            </div>
                                         </td>
-                                        <td className="px-8 py-6 font-bold text-slate-600">{item.date}</td>
-                                        <td className={`px-8 py-6 text-right text-xl font-black ${type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>${item.amount.toLocaleString()}</td>
+                                        <td className="px-8 py-6">
+                                            <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter">
+                                                {item.date}
+                                            </span>
+                                        </td>
+                                        <td className={`px-8 py-6 text-right text-xl font-black ${type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                            ${item.amount.toLocaleString()}
+                                        </td>
                                         <td className="px-8 py-6 text-right">
-                                            <button onClick={() => onDelete(item.id)} className="p-3 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all opacity-0 group-hover:opacity-100">
-                                                <i data-lucide="trash-2" className="w-5 h-5"></i>
+                                            <button onClick={() => onDelete(item.id)} className="p-3 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all md:opacity-0 group-hover:opacity-100 active:scale-90">
+                                                <Icon name="trash-2" className="w-5 h-5" />
                                             </button>
                                         </td>
                                     </tr>
                                 ))}
+                                {data.length === 0 && (
+                                    <tr>
+                                        <td colSpan="5" className="px-8 py-24 text-center">
+                                            <div className="flex flex-col items-center gap-4 text-slate-300">
+                                                <Icon name="folder-open" className="w-12 h-12" />
+                                                <p className="font-black text-xl uppercase tracking-widest italic">Bandeja Vacía</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- Utilidades Visuales ---
+
+        function StatItem({ title, value, color, icon }) {
+            const c = {
+                emerald: "bg-emerald-50 text-emerald-600 border-emerald-100 shadow-emerald-100/50",
+                blue: "bg-blue-50 text-blue-600 border-blue-100 shadow-blue-100/50",
+                rose: "bg-rose-50 text-rose-600 border-rose-100 shadow-rose-100/50",
+                purple: "bg-purple-50 text-purple-600 border-purple-100 shadow-purple-100/50",
+            };
+            return (
+                <div className={`bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col gap-4 group hover:border-indigo-200 transition-all hover:shadow-md`}>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shrink-0 ${c[color]} transition-transform group-hover:scale-110`}>
+                        <Icon name={icon} />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{title}</p>
+                        <p className="text-2xl font-black text-slate-900">${value.toLocaleString()}</p>
+                    </div>
+                </div>
+            );
+        }
+
+        function Bar({ label, value, total, color }) {
+            const p = total > 0 ? Math.min((value / total) * 100, 100) : 0;
+            return (
+                <div className="space-y-3">
+                    <div className="flex justify-between items-end">
+                        <span className="text-xs font-black text-slate-800 uppercase tracking-tighter">{label}</span>
+                        <span className="text-sm font-black text-indigo-600">{p.toFixed(0)}%</span>
+                    </div>
+                    <div className="h-4 bg-slate-100 rounded-full overflow-hidden p-1 shadow-inner">
+                        <div className={`h-full rounded-full ${color} transition-all duration-1000 ease-out shadow-sm`} style={{ width: `${p}%` }}></div>
                     </div>
                 </div>
             );
