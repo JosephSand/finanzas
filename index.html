@@ -38,6 +38,16 @@
         .action-btn-red { background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
         .action-btn-blue { background-color: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
         .btn-action-size { width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 12px; transition: all 0.2s; }
+        
+        .chart-bar-container { height: 200px; display: flex; align-items: flex-end; gap: 12px; }
+        .chart-bar { 
+            width: 100%; 
+            background: linear-gradient(to top, #4f46e5, #818cf8);
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            transition: height 1s ease-out;
+            min-height: 4px;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 text-left">
@@ -73,33 +83,32 @@
             const [editingId, setEditingId] = useState(null);
             const [formData, setFormData] = useState({ type: 'expense', category: '', amount: '', date: new Date().toISOString().split('T')[0] });
 
-            // Persistencia y Lógica de Reinicio Mensual (Día 1)
+            // Carga inicial y Reinicio Mensual (Día 1)
             const [transactions, setTransactions] = useState(() => {
-                const saved = localStorage.getItem('ff_pro_real_v13');
-                const lastResetMonth = localStorage.getItem('ff_last_reset_v13');
+                const saved = localStorage.getItem('ff_pro_real_v15');
+                const lastResetMonth = localStorage.getItem('ff_last_reset_v15');
                 const now = new Date();
                 const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
                 
                 let data = saved ? JSON.parse(saved) : [];
 
                 if (lastResetMonth && lastResetMonth !== currentMonthKey) {
-                    // Reinicio el día 1: Limpiar variables/ingresos, mantener fijos pero no pagados
                     data = data.filter(t => t.type === 'fixed').map(t => ({ ...t, isPaid: false }));
-                    localStorage.setItem('ff_last_reset_v13', currentMonthKey);
+                    localStorage.setItem('ff_last_reset_v15', currentMonthKey);
                 } else if (!lastResetMonth) {
-                    localStorage.setItem('ff_last_reset_v13', currentMonthKey);
+                    localStorage.setItem('ff_last_reset_v15', currentMonthKey);
                 }
                 return data;
             });
 
             useEffect(() => {
-                localStorage.setItem('ff_pro_real_v13', JSON.stringify(transactions));
+                localStorage.setItem('ff_pro_real_v15', JSON.stringify(transactions));
                 if(window.lucide) window.lucide.createIcons();
             }, [transactions, activeTab, isSidebarCollapsed, isModalOpen]);
 
             const showToast = (message, type = 'success') => setToast({ message, type });
 
-            // CÁLCULOS DINÁMICOS Y CONTROL DE DÍAS
+            // CÁLCULOS DINÁMICOS
             const stats = useMemo(() => {
                 const income = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
                 const fixed = transactions.filter(t => t.type === 'fixed');
@@ -113,16 +122,17 @@
                 const realBalance = income - (paidFixed + variable + savings);
                 const projectedBalance = income - (totalFixed + variable + savings);
 
-                // Lógica de Calendario dinámica
+                // Lógica de Calendario dinámica para el divisor
                 const now = new Date();
-                const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
                 const currentDay = now.getDate();
-                const daysRemaining = (lastDay - currentDay) + 1; // Incluyendo hoy
+                const divisor = totalDaysInMonth - currentDay;
 
-                // Fórmula: Saldo Proyectado / Días Faltantes
-                const dailyLimit = projectedBalance > 0 ? (projectedBalance / daysRemaining) : 0;
+                // Fórmula: Saldo Proyectado / (Días totales - Días actuales)
+                // Se protege división por cero si es el último día del mes
+                const dailyLimit = divisor > 0 && projectedBalance > 0 ? (projectedBalance / divisor) : (projectedBalance > 0 ? projectedBalance : 0);
 
-                return { income, totalFixed, paidFixed, pendingFixed, variable, savings, realBalance, projectedBalance, dailyLimit, daysRemaining };
+                return { income, totalFixed, paidFixed, pendingFixed, variable, savings, realBalance, projectedBalance, dailyLimit, divisor };
             }, [transactions]);
 
             const handleSave = (e) => {
@@ -130,11 +140,11 @@
                 if (!formData.amount || !formData.category) return;
                 if (editingId) {
                     setTransactions(prev => prev.map(t => t.id === editingId ? { ...t, ...formData, amount: Number(formData.amount) } : t));
-                    showToast("Actualizado");
+                    showToast("Registro actualizado");
                 } else {
                     const item = { ...formData, id: Date.now(), amount: Number(formData.amount), isPaid: formData.type === 'income' };
                     setTransactions(prev => [...prev, item]);
-                    showToast("Guardado");
+                    showToast("Registro guardado");
                 }
                 setIsModalOpen(false);
                 setEditingId(null);
@@ -155,7 +165,7 @@
                 { id: 'fixed', label: 'Gastos Fijos', icon: 'calendar-check' },
                 { id: 'expense', label: 'Variables', icon: 'shopping-bag' },
                 { id: 'saving', label: 'Ahorros', icon: 'piggy-bank' },
-                { id: 'projections', label: 'Proyecciones', icon: 'line-chart' },
+                { id: 'projections', label: 'Proyecciones de Ahorro', icon: 'line-chart' },
                 { id: 'report', label: 'Cierre de Mes', icon: 'file-text' },
             ];
 
@@ -216,24 +226,24 @@
                     {isModalOpen && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
-                            <div className="bg-white rounded-[2rem] p-8 w-full max-w-lg shadow-2xl relative animate-in border border-slate-100 text-left">
-                                <h3 className="text-xl font-black text-slate-800 mb-6 uppercase tracking-tight">{editingId ? 'Editar' : 'Nueva'} Operación</h3>
+                            <div className="bg-white rounded-[2rem] p-8 w-full max-w-lg shadow-2xl relative animate-in border border-slate-100 text-left text-left text-left">
+                                <h3 className="text-xl font-black text-slate-800 mb-6 uppercase tracking-tight text-left">{editingId ? 'Editar' : 'Nueva'} Operación</h3>
                                 <form onSubmit={handleSave} className="space-y-5 text-left">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="col-span-2 sm:col-span-1">
                                             <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Tipo</label>
-                                            <select value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})} className="w-full bg-slate-50 rounded-xl p-4 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-600 transition-all border-none ring-1 ring-slate-200">
+                                            <select value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})} className="w-full bg-slate-50 rounded-xl p-4 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-600 transition-all border-none ring-1 ring-slate-200 text-left">
                                                 <option value="income">Ingreso</option><option value="fixed">Gasto Fijo</option><option value="expense">Gasto Variable</option><option value="saving">Ahorro</option>
                                             </select>
                                         </div>
-                                        <div className="col-span-2 sm:col-span-1">
+                                        <div className="col-span-2 sm:col-span-1 text-left">
                                             <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Monto ($)</label>
-                                            <input type="number" step="0.01" required value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className="w-full bg-slate-50 rounded-xl p-4 font-black text-lg text-indigo-600 ring-1 ring-slate-200 border-none" />
+                                            <input type="number" step="0.01" required value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className="w-full bg-slate-50 rounded-xl p-4 font-black text-lg text-indigo-600 ring-1 ring-slate-200 border-none transition-all" />
                                         </div>
                                     </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Concepto / Nombre</label>
-                                        <input type="text" required value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full bg-slate-50 rounded-xl p-4 font-bold outline-none focus:ring-2 focus:ring-indigo-600 ring-1 ring-slate-200 border-none" />
+                                    <div className="col-span-2 text-left">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Concepto</label>
+                                        <input type="text" required value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full bg-slate-50 rounded-xl p-4 font-bold outline-none focus:ring-2 focus:ring-indigo-600 ring-1 ring-slate-200 border-none transition-all" />
                                     </div>
                                     <button type="submit" className="w-full bg-indigo-600 text-white p-5 rounded-xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all">
                                         {editingId ? 'Guardar Cambios' : 'Confirmar Registro'}
@@ -258,44 +268,49 @@
             );
         }
 
-        // --- DASHBOARD ---
+        // --- COMPONENTE DASHBOARD ---
         function Dashboard({ stats, transactions, onEdit, onDelete, onToggle }) {
             const fixedItems = transactions.filter(t => t.type === 'fixed');
             return (
                 <div className="space-y-8 animate-in text-left">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <KPICard title="Presupuesto Diario" value={stats.dailyLimit} color="indigo" icon="zap" highlight />
+                        <KPICard title="Presupuesto Diario Hoy" value={stats.dailyLimit} color="indigo" icon="zap" highlight />
                         <KPICard title="Saldo Líquido Actual" value={stats.realBalance} color="emerald" icon="wallet" />
                         <KPICard title="Ingresos Totales" value={stats.income} color="blue" icon="arrow-up-right" />
-                        <KPICard title="Saldo Proyectado" value={stats.projectedBalance} color="purple" icon="target" />
+                        <KPICard title="Saldo Proyectado Final" value={stats.projectedBalance} color="purple" icon="target" />
                     </div>
                     
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm text-left overflow-hidden">
                             <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-8 text-left">Gestión de Gastos Fijos</h3>
-                            <div className="space-y-4">
+                            <div className="space-y-4 text-left">
                                 {fixedItems.map(t => (
                                     <div key={t.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100 gap-4 group">
-                                        <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-4 text-left">
                                             <button onClick={() => onToggle(t.id)} className={`w-11 h-11 rounded-2xl border-2 flex items-center justify-center transition-all ${t.isPaid ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-white border-slate-200'}`}><Icon name="check" /></button>
                                             <span className={`font-bold text-sm ${t.isPaid ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{t.category}</span>
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <span className="font-black text-sm text-slate-900">${t.amount.toLocaleString()}</span>
                                             <div className="flex gap-2 no-print">
-                                                <button onClick={() => onEdit(t)} className="btn-action-size action-btn-blue"><Icon name="edit-3" /></button>
-                                                <button onClick={() => onDelete(t.id)} className="btn-action-size action-btn-red"><Icon name="trash-2" /></button>
+                                                <button onClick={() => onEdit(t)} className="btn-action-size action-btn-blue shadow-sm"><Icon name="edit-3" className="w-4 h-4" /></button>
+                                                <button onClick={() => onDelete(t.id)} className="btn-action-size action-btn-red shadow-sm"><Icon name="trash-2" className="w-4 h-4" /></button>
                                             </div>
                                         </div>
                                     </div>
                                 ))}
+                                {fixedItems.length === 0 && <p className="text-slate-300 text-sm italic text-center py-10">Sin gastos fijos registrados.</p>}
                             </div>
                         </div>
-                        <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col text-left">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Distribución Mensual</h3>
-                            <Metric label="Fijos" value={stats.totalFixed} total={stats.income} color="bg-indigo-500" />
-                            <Metric label="Variables" value={stats.variable} total={stats.income} color="bg-orange-500" />
-                            <Metric label="Ahorro" value={stats.savings} total={stats.income} color="bg-purple-500" />
+                        <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col text-left text-left">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-8 text-left">Distribución Mensual</h3>
+                            <Metric label="Fijos (Obligaciones)" value={stats.totalFixed} total={stats.income} color="bg-indigo-500" />
+                            <Metric label="Variables (Día a Día)" value={stats.variable} total={stats.income} color="bg-orange-500" />
+                            <Metric label="Ahorro Realizado" value={stats.savings} total={stats.income} color="bg-purple-500" />
+                            <div className="mt-auto pt-8 border-t border-slate-50 text-left text-left">
+                                <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Saldo Final de Supervivencia</p>
+                                <p className={`text-2xl font-black ${stats.projectedBalance >= 0 ? 'text-indigo-600' : 'text-rose-600'} text-left text-left text-left text-left`}>${stats.projectedBalance.toLocaleString()}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -304,51 +319,57 @@
 
         // --- VISTA DE PROYECCIONES ---
         function ProjectionsView({ stats }) {
-            const monthlySaving = stats.savings;
-            const timeline = [6, 12, 24, 36];
-            const projections = timeline.map(months => monthlySaving * months);
-            const maxVal = Math.max(...projections) || 1;
+            const monthlySaving = stats.savings || 0;
+            const periods = [
+                { label: '6 Meses', months: 6 },
+                { label: '1 Año', months: 12 },
+                { label: '2 Años', months: 24 },
+                { label: '3 Años', months: 36 }
+            ];
+
+            const projections = periods.map(p => monthlySaving * p.months);
+            const maxVal = Math.max(...projections, 1);
 
             return (
                 <div className="animate-in space-y-8 text-left">
-                    <div className="bg-indigo-600 rounded-[2.5rem] p-10 text-white shadow-xl relative overflow-hidden">
-                        <div className="relative z-10">
-                            <h3 className="text-xs font-black uppercase tracking-[0.2em] opacity-60 mb-2">Ahorro Mensual Actual</h3>
+                    <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-xl relative overflow-hidden">
+                        <div className="relative z-10 text-left text-left">
+                            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-2">Potencial de Ahorro Mensual</h3>
                             <p className="text-4xl font-black">${monthlySaving.toLocaleString()}</p>
-                            <p className="text-sm mt-4 opacity-80 max-w-md italic">Proyecciones lineales basadas en tu ritmo de ahorro actual este mes.</p>
+                            <p className="text-sm mt-4 text-slate-400 max-w-md italic">Cálculos lineales basados en tu comportamiento de ahorro actual.</p>
                         </div>
-                        <div className="absolute right-0 bottom-0 opacity-10"><Icon name="trending-up" className="w-48 h-48" /></div>
+                        <Icon name="trending-up" className="absolute right-[-20px] bottom-[-20px] w-64 h-64 text-indigo-500 opacity-10" />
                     </div>
 
-                    <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-10">Proyección de Crecimiento de Capital</h3>
+                    <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm text-left">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-12">Visualización de Crecimiento</h3>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-end h-64">
-                            {timeline.map((months, i) => {
+                        <div className="chart-bar-container text-left text-left text-left">
+                            {periods.map((p, i) => {
                                 const height = (projections[i] / maxVal) * 100;
                                 return (
-                                    <div key={months} className="flex flex-col items-center gap-4 h-full justify-end group">
-                                        <div className="bg-slate-50 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <span className="text-[10px] font-black text-indigo-600">${projections[i].toLocaleString()}</span>
+                                    <div key={p.months} className="flex-1 flex flex-col items-center gap-4 group text-left">
+                                        <div className="bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
+                                            ${projections[i].toLocaleString()}
                                         </div>
                                         <div 
-                                            className="w-full bg-indigo-500 rounded-2xl transition-all duration-1000 ease-out hover:bg-indigo-600 shadow-lg shadow-indigo-100"
-                                            style={{ height: `${height}%` }}
+                                            className="chart-bar w-full shadow-lg shadow-indigo-100" 
+                                            style={{ height: `${Math.max(height, 5)}%` }}
                                         ></div>
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{months} Meses</span>
+                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">{p.label}</span>
                                     </div>
                                 );
                             })}
                         </div>
-                        
-                        <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-6 pt-10 border-t border-slate-50">
-                            <div className="p-6 bg-slate-50 rounded-3xl">
-                                <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Meta a 1 Año</p>
-                                <p className="text-xl font-black text-slate-800">${(monthlySaving * 12).toLocaleString()}</p>
+
+                        <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 gap-6 pt-10 border-t border-slate-50 text-left text-left text-left">
+                            <div className="p-8 bg-indigo-50 rounded-3xl border border-indigo-100 text-left">
+                                <p className="text-[10px] font-black text-indigo-600 uppercase mb-2">Meta a 12 meses</p>
+                                <p className="text-2xl font-black text-indigo-900">${(monthlySaving * 12).toLocaleString()}</p>
                             </div>
-                            <div className="p-6 bg-slate-50 rounded-3xl">
-                                <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Meta a 3 Años</p>
-                                <p className="text-xl font-black text-slate-800">${(monthlySaving * 36).toLocaleString()}</p>
+                            <div className="p-8 bg-slate-50 rounded-3xl border border-slate-200 text-left">
+                                <p className="text-[10px] font-black text-slate-500 uppercase mb-2">Meta a 36 meses</p>
+                                <p className="text-2xl font-black text-slate-800">${(monthlySaving * 36).toLocaleString()}</p>
                             </div>
                         </div>
                     </div>
@@ -359,20 +380,20 @@
         function DataList({ title, data, isFixed, onEdit, onDelete, onToggle }) {
             return (
                 <div className="animate-in space-y-6 text-left">
-                    <h3 className="text-2xl font-black tracking-tight">{title}</h3>
-                    <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-x-auto">
-                        <table className="w-full text-left min-w-[600px]">
-                            <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase border-b border-slate-100">
-                                <tr>{isFixed && <th className="px-8 py-5 w-24 text-center">Pago</th>}<th className="px-8 py-5 text-left">Concepto</th><th className="px-8 py-5 text-center">Fecha</th><th className="px-8 py-5 text-right">Monto</th><th className="px-8 py-5 text-center w-48">Acciones</th></tr>
+                    <h3 className="text-2xl font-black tracking-tight text-left">{title}</h3>
+                    <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-x-auto text-left">
+                        <table className="w-full text-left min-w-[600px] text-left">
+                            <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-left">
+                                <tr>{isFixed && <th className="px-8 py-5 w-24 text-center">Pago</th>}<th className="px-8 py-5 text-left">Concepto</th><th className="px-8 py-5 text-center text-left">Fecha</th><th className="px-8 py-5 text-right text-right text-right">Monto</th><th className="px-8 py-5 text-center w-48 text-left text-left">Acciones</th></tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 text-sm">
+                            <tbody className="divide-y divide-slate-100 text-sm text-left">
                                 {data.map(t => (
                                     <tr key={t.id} className={`hover:bg-slate-50/50 transition-all ${isFixed && t.isPaid ? 'opacity-60 bg-slate-50/30' : ''}`}>
-                                        {isFixed && (<td className="px-8 py-5 text-center"><button onClick={() => onToggle(t.id)} className={`w-10 h-10 rounded-2xl border-2 flex items-center justify-center transition-all ${t.isPaid ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'border-slate-200'}`}><Icon name="check" /></button></td>)}
-                                        <td className={`px-8 py-5 font-bold ${isFixed && t.isPaid ? 'line-through text-slate-400' : 'text-slate-800'}`}>{t.category}</td>
-                                        <td className="px-8 py-5 text-center text-slate-500">{t.date}</td>
-                                        <td className="px-8 py-5 text-right font-black text-slate-900">${t.amount.toLocaleString()}</td>
-                                        <td className="px-8 py-5 text-left"><div className="flex justify-center gap-3"><button onClick={() => onEdit(t)} className="action-icon-size btn-action-blue"><Icon name="edit-3" /></button><button onClick={() => onDelete(t.id)} className="action-icon-size btn-action-red"><Icon name="trash-2" /></button></div></td>
+                                        {isFixed && (<td className="px-8 py-5 text-center text-left text-left"><button onClick={() => onToggle(t.id)} className={`w-10 h-10 rounded-2xl border-2 flex items-center justify-center transition-all ${t.isPaid ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'border-slate-200'}`}><Icon name="check" /></button></td>)}
+                                        <td className={`px-8 py-5 font-bold ${isFixed && t.isPaid ? 'line-through text-slate-400' : 'text-slate-800'} text-left text-left`}>{t.category}</td>
+                                        <td className="px-8 py-5 text-center text-slate-500 text-left">{t.date}</td>
+                                        <td className="px-8 py-5 text-right font-black text-slate-900 text-right text-right text-right">${t.amount.toLocaleString()}</td>
+                                        <td className="px-8 py-5 text-left text-left text-left"><div className="flex justify-center gap-3 text-left"><button onClick={() => onEdit(t)} className="action-icon-size btn-action-blue shadow-sm"><Icon name="edit-3" /></button><button onClick={() => onDelete(t.id)} className="action-icon-size btn-action-red shadow-sm"><Icon name="trash-2" /></button></div></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -384,26 +405,32 @@
 
         function ReportView({ stats, transactions }) {
             const currentMonthName = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+            const incomeItems = transactions.filter(t => t.type === 'income');
+            const fixedItems = transactions.filter(t => t.type === 'fixed');
+            const variableItems = transactions.filter(t => t.type === 'expense');
+            const savingItems = transactions.filter(t => t.type === 'saving');
+
             return (
                 <div className="animate-in pb-12 text-left">
-                    <div className="print-card bg-white p-12 md:p-20 rounded-[3rem] border border-slate-200 shadow-xl relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-3 bg-indigo-600 no-print"></div>
-                        <div className="flex flex-col md:flex-row justify-between items-start border-b-2 border-slate-100 pb-10 mb-12 gap-6">
-                            <div><h1 className="text-4xl font-black text-slate-950 uppercase tracking-tighter leading-tight">Estado Mensual</h1><p className="text-lg font-bold text-indigo-600 uppercase tracking-[0.2em] mt-2">{currentMonthName}</p></div>
-                            <div className="text-left md:text-right flex flex-col gap-1 text-slate-400 font-bold text-xs uppercase tracking-widest">
-                                <span>Ref: FF-{Date.now().toString().slice(-8)}</span>
-                                <span>Emitido: {new Date().toLocaleDateString()}</span>
+                    <div className="print-card bg-white p-12 md:p-16 rounded-[3rem] border border-slate-200 shadow-xl relative overflow-hidden text-left text-left">
+                        <div className="absolute top-0 left-0 w-full h-3 bg-indigo-600 no-print text-left text-left"></div>
+                        <div className="flex flex-col md:flex-row justify-between items-start border-b-2 border-slate-100 pb-10 mb-12 text-left gap-6 text-left">
+                            <div><h1 className="text-4xl font-black text-slate-950 uppercase tracking-tighter leading-tight text-left">Cierre Mensual</h1><p className="text-lg font-bold text-indigo-600 uppercase tracking-[0.2em] mt-2 text-left text-left">{currentMonthName}</p></div>
+                            <div className="text-left md:text-right flex flex-col gap-1 text-left text-left text-left">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-left text-left">Ref Documental</span>
+                                <p className="text-sm font-bold text-slate-900 text-left text-left">FF-{Date.now().toString().slice(-8)}</p>
+                                <p className="text-xs text-slate-400 font-bold">{new Date().toLocaleDateString()}</p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-                            <div className="p-8 bg-emerald-50 rounded-[2.5rem] border border-emerald-100"><p className="text-[10px] font-black uppercase text-emerald-600 mb-2">Ingresos Totales</p><p className="text-3xl font-black text-emerald-700">${stats.income.toLocaleString()}</p></div>
-                            <div className="p-8 bg-rose-50 rounded-[2.5rem] border border-rose-100"><p className="text-[10px] font-black uppercase text-rose-600 mb-2">Salidas del Capital</p><p className="text-3xl font-black text-rose-700">${(stats.totalFixed + stats.variable + stats.savings).toLocaleString()}</p></div>
-                            <div className="p-8 bg-slate-950 text-white rounded-[2.5rem] shadow-2xl"><p className="text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Saldo Real Líquido</p><p className="text-3xl font-black">${stats.realBalance.toLocaleString()}</p></div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 text-left text-left">
+                            <div className="p-8 bg-emerald-50 rounded-[2rem] text-left text-left"><p className="text-[10px] font-black uppercase text-emerald-600 mb-1">Total Ingresos</p><p className="text-3xl font-black text-left">${stats.income.toLocaleString()}</p></div>
+                            <div className="p-8 bg-rose-50 rounded-[2rem] text-left text-left text-left"><p className="text-[10px] font-black uppercase text-rose-600 mb-1">Total Gastos</p><p className="text-3xl font-black text-left">${(stats.totalFixed + stats.variable + stats.savings).toLocaleString()}</p></div>
+                            <div className="p-8 bg-slate-950 text-white rounded-[2rem] shadow-2xl text-left text-left text-left text-left text-left"><p className="text-[10px] font-black uppercase text-slate-400 mb-1">Saldo Real</p><p className="text-3xl font-black text-left">${stats.realBalance.toLocaleString()}</p></div>
                         </div>
-                        <div className="space-y-12">
-                            <ReportItem title="Entradas de Capital" items={transactions.filter(t => t.type === 'income')} />
-                            <ReportItem title="Estructura de Gastos Fijos" items={transactions.filter(t => t.type === 'fixed')} isFixed />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12"><ReportItem title="Gastos Variables" items={transactions.filter(t => t.type === 'expense')} /><ReportItem title="Ahorro Realizado" items={transactions.filter(t => t.type === 'saving')} /></div>
+                        <div className="space-y-12 text-left text-left text-left">
+                            <ReportItem title="Entradas de Dinero" items={incomeItems} />
+                            <ReportItem title="Obligaciones Fijas" items={fixedItems} isFixed />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left text-left text-left text-left text-left text-left text-left text-left"><ReportItem title="Gastos Variables" items={variableItems} /><ReportItem title="Ahorro Real" items={savingItems} /></div>
                         </div>
                     </div>
                 </div>
@@ -413,15 +440,15 @@
         function ReportItem({ title, items, isFixed }) {
             const total = items.reduce((acc, t) => acc + t.amount, 0);
             return (
-                <section>
-                    <h5 className="text-[10px] font-black text-slate-900 uppercase border-b-2 border-slate-100 pb-3 mb-6 flex justify-between tracking-[0.2em]">
-                        <span>{title}</span><span className="text-indigo-600 font-black">${total.toLocaleString()}</span>
+                <section className="text-left text-left text-left text-left text-left">
+                    <h5 className="text-[10px] font-black text-slate-900 uppercase border-b-2 border-slate-100 pb-3 mb-6 flex justify-between tracking-[0.2em] text-left text-left">
+                        <span>{title}</span><span className="text-indigo-600 font-black text-left text-left">${total.toLocaleString()}</span>
                     </h5>
-                    <div className="space-y-3">
+                    <div className="space-y-3 text-left">
                         {items.map(item => (
-                            <div key={item.id} className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                <span className={`font-semibold ${isFixed && !item.isPaid ? 'text-rose-500' : 'text-slate-600'}`}>{item.category} {isFixed && <span className="text-[9px] font-black ml-1">[{item.isPaid ? 'LIQUIDADO' : 'PTE'}]</span>}</span>
-                                <span className="font-black text-slate-900">${item.amount.toLocaleString()}</span>
+                            <div key={item.id} className="flex justify-between text-xs py-1 border-b border-slate-50 text-left text-left">
+                                <span className={`font-semibold ${isFixed && !item.isPaid ? 'text-rose-500' : 'text-slate-600'} text-left text-left text-left text-left`}>{item.category} {isFixed && <span className="text-[9px] font-black ml-1 text-left text-left text-left">[{item.isPaid ? 'LIQUIDADO' : 'PTE'}]</span>}</span>
+                                <span className="font-black text-slate-900 text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left">${item.amount.toLocaleString()}</span>
                             </div>
                         ))}
                     </div>
@@ -430,14 +457,14 @@
         }
 
         function KPICard({ title, value, color, icon, highlight }) {
-            const colors = { indigo: "bg-indigo-600 text-white shadow-xl shadow-indigo-200 border-transparent", emerald: "bg-white text-slate-900 border-slate-200", blue: "bg-white text-slate-900 border-slate-200", purple: "bg-white text-slate-900 border-slate-200" };
-            const iconColors = { indigo: "bg-indigo-500 text-white shadow-sm", emerald: "bg-emerald-50 text-emerald-600", blue: "bg-blue-50 text-blue-600", purple: "bg-purple-50 text-purple-600" };
+            const colors = { indigo: "bg-indigo-600 text-white shadow-xl shadow-indigo-200 border-transparent", emerald: "bg-white text-slate-900 border-slate-200", blue: "bg-white text-slate-900 border-slate-200", purple: "bg-white text-slate-900 border-slate-200", amber: "bg-white text-slate-900 border-slate-200" };
+            const iconColors = { indigo: "bg-indigo-500 text-white shadow-sm", emerald: "bg-emerald-50 text-emerald-600", blue: "bg-blue-50 text-blue-600", purple: "bg-purple-50 text-purple-600", amber: "bg-amber-50 text-amber-600" };
             return (
-                <div className={`${colors[color]} p-6 rounded-[2rem] border shadow-sm flex flex-col gap-5 transition-all text-left`}>
+                <div className={`${colors[color]} p-6 rounded-[2rem] border shadow-sm flex flex-col gap-5 transition-all text-left text-left text-left text-left text-left text-left text-left text-left text-left`}>
                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 ${iconColors[color]} shadow-sm`}><Icon name={icon} className="w-6 h-6" /></div>
-                    <div className="text-left">
-                        <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 ${highlight ? 'text-indigo-100' : 'text-slate-400'}`}>{title}</p>
-                        <p className="text-2xl font-black tracking-tight">${value.toLocaleString()}</p>
+                    <div className="text-left text-left text-left text-left">
+                        <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 text-left text-left text-left text-left ${highlight ? 'text-indigo-100' : 'text-slate-400'}`}>{title}</p>
+                        <p className="text-2xl font-black tracking-tight text-left text-left text-left text-left text-left text-left">${value.toLocaleString()}</p>
                     </div>
                 </div>
             );
@@ -446,9 +473,9 @@
         function Metric({ label, value, total, color }) {
             const p = total > 0 ? Math.min((value / total) * 100, 100) : 0;
             return (
-                <div className="space-y-3 mb-8 last:mb-0 text-left">
-                    <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-tighter"><span>{label}</span><span>{p.toFixed(0)}%</span></div>
-                    <div className="h-3 bg-slate-100 rounded-full overflow-hidden p-0.5"><div className={`h-full rounded-full ${color} transition-all duration-1000 shadow-sm`} style={{ width: `${p}%` }}></div></div>
+                <div className="space-y-3 mb-8 last:mb-0 text-left text-left text-left text-left">
+                    <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-tighter text-left text-left text-left text-left text-left text-left text-left"><span>{label}</span><span>{p.toFixed(0)}%</span></div>
+                    <div className="h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><div className={`h-full rounded-full ${color} transition-all duration-1000 shadow-sm text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left`} style={{ width: `${p}%` }}></div></div>
                 </div>
             );
         }
